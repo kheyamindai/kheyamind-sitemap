@@ -1,9 +1,9 @@
-name: Update Sitemap Dates
+name: Update Sitemap Dates (Selective + Backup + Cleanup)
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Runs daily at midnight UTC
-  workflow_dispatch:     # Allows manual run
+    - cron: '0 6 * * 1'  # Daily at midnight UTC
+  workflow_dispatch:
 
 jobs:
   update-sitemap:
@@ -12,18 +12,33 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update lastmod dates in sitemap.xml
+      - name: Backup current sitemap.xml
+        run: |
+          mkdir -p backups
+          cp sitemap.xml "backups/sitemap-$(date -u +'%Y-%m-%d').xml"
+
+      - name: Update <lastmod> for selected URLs only
         run: |
           TODAY=$(date -u +"%Y-%m-%d")
-          sed -i "s|<lastmod>[^<]*</lastmod>|<lastmod>${TODAY}</lastmod>|g" sitemap.xml
+
+          sed -i "/<loc>https:\/\/www.kheyamind.ai\/<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
+          sed -i "/<loc>https:\/\/www.kheyamind.ai\/about-us<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
+          sed -i "/<loc>https:\/\/www.kheyamind.ai\/services<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
+          sed -i "/<loc>https:\/\/www.kheyamind.ai\/blogs<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
+
+      - name: Delete backups older than 30 days
+        run: |
+          find backups -name "sitemap-*.xml" -type f -mtime +30 -exec rm -f {} \;
 
       - name: Commit and push changes
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
-          git add sitemap.xml
-          git commit -m "Auto-update sitemap lastmod to ${TODAY}" || echo "No changes to commit"
+          git add sitemap.xml backups/
+          git commit -m "Auto-update <lastmod> and cleanup old backups on ${TODAY}" || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
