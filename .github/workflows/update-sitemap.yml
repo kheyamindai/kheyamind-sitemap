@@ -42,3 +42,6 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        - name: Ping Google to notify sitemap update
+        run: |
+          curl https://www.google.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml
