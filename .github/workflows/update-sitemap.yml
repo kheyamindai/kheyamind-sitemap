@@ -25,3 +25,5 @@ jobs:
           git add sitemap.xml
           git commit -m "Auto-update sitemap lastmod to ${TODAY}" || echo "No changes to commit"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
