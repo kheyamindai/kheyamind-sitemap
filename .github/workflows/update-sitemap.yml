@@ -1,4 +1,4 @@
-name: Update Sitemap Dates (Selective + Backup + Cleanup)
+name: Update Sitemap Dates (Selective + Backup + Cleanup + Google Ping)
 
 on:
   schedule:
@@ -38,10 +38,11 @@ jobs:
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add sitemap.xml backups/
-          git commit -m "Auto-update <lastmod> and cleanup old backups on ${TODAY}" || echo "No changes to commit"
+          git commit -m "Auto-update <lastmod>, backup, and cleanup on ${TODAY}" || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Ping Google to notify sitemap update
+
+      - name: Ping Google to notify sitemap update
         run: |
-          curl https://www.google.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml
+          curl "https://www.google.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml"
