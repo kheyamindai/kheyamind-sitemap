@@ -46,3 +46,7 @@ jobs:
       - name: Ping Google to notify sitemap update
         run: |
           curl "https://www.google.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml"
+
+      - name: Ping IndexNow for blog URL
+        run: |
+          curl -X POST "https://api.indexnow.org/indexnow?url=https://www.kheyamind.ai/blogs&key=095beba3557996ed85a29a5d68394867"
