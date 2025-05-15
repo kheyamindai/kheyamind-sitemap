@@ -2,51 +2,74 @@ name: Update Sitemap Dates (Selective + Backup + Cleanup + Google Ping)
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Daily at midnight UTC
+    - cron: '0 0 * * *'  # Daily at midnight UTC
   workflow_dispatch:
 
 jobs:
   update-sitemap:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
+      
       - name: Backup current sitemap.xml
         run: |
           mkdir -p backups
-          cp sitemap.xml "backups/sitemap-$(date -u +'%Y-%m-%d').xml"
-
-      - name: Update <lastmod> for selected URLs only
+          cp sitemap.xml "backups/sitemap-$(date -u +"%Y-%m-%d").xml"
+      
+      - name: Update lastmods for selected URLs only
         run: |
           TODAY=$(date -u +"%Y-%m-%d")
-
-          sed -i "/<loc>https:\/\/www.kheyamind.ai\/<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
-          sed -i "/<loc>https:\/\/www.kheyamind.ai\/about-us<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
-          sed -i "/<loc>https:\/\/www.kheyamind.ai\/services<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
-          sed -i "/<loc>https:\/\/www.kheyamind.ai\/blogs<\/loc>/{n;s|<lastmod>.*</lastmod>|<lastmod>${TODAY}</lastmod>|}" sitemap.xml
-
+          
+          sed -i "s/<lastmod>.*<\/lastmod>\(<\/url>\)/<lastmod>${TODAY}<\/lastmod>\1/" sitemap.xml
+          sed -i "s/<lastmod>.*<\/lastmod>\(<\/loc><priority>0.85<\/priority><changefreq>weekly<\/changefreq>\)/<lastmod>${TODAY}<\/lastmod>\1/" sitemap.xml
+          sed -i "s/<lastmod>.*<\/lastmod>\(<\/loc><priority>0.85<\/priority><changefreq>daily<\/changefreq>\)/<lastmod>${TODAY}<\/lastmod>\1/" sitemap.xml
+          sed -i "s/<lastmod>.*<\/lastmod>\(<\/loc><priority>0.9<\/priority><changefreq>weekly<\/changefreq>\)/<lastmod>${TODAY}<\/lastmod>\1/" sitemap.xml
+      
+      - name: Validate sitemap XML
+        run: |
+          sudo apt-get install -y libxml2-utils
+          xmllint --noout sitemap.xml || echo "Warning: Sitemap validation failed"
+      
       - name: Delete backups older than 30 days
         run: |
           find backups -name "sitemap-*.xml" -type f -mtime +30 -exec rm -f {} \;
-
-      - name: Commit and push changes
+      
+      - name: Commit and push changes if needed
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
-          git add sitemap.xml backups/
-          git commit -m "Auto-update <lastmod>, backup, and cleanup on ${TODAY}" || echo "No changes to commit"
-          git push
+          
+          if [[ $(git status --porcelain sitemap.xml) ]]; then
+            git add sitemap.xml backups/
+            git commit -m "Auto-update <lastmod>, backup, and cleanup on $(date -u +"%Y-%m-%d")" || echo "No changes to commit"
+            git push
+          else
+            echo "No changes to sitemap.xml"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      
       - name: Ping Google to notify sitemap update
         run: |
           curl "https://www.google.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml"
-
+      
+      - name: Ping Bing to notify sitemap update
+        run: |
+          curl -X GET "https://www.bing.com/ping?sitemap=https://sitemap.kheyamind.ai/sitemap.xml"
+      
       - name: Ping IndexNow for blog URL
         run: |
-          curl -X POST "https://api.indexnow.org/indexnow?url=https://www.kheyamind.ai/blogs&key=095beba3557996ed85a29a5d68394867"
+          curl -X POST "https://api.indexnow.org/indexnow?url=https://www.kheyamind.ai/blog&key=995beba3557996ed85a29a5d68394867"
+      
+      - name: Notify on workflow completion
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "Sitemap update workflow completed successfully"
+          else
+            echo "Sitemap update workflow failed or had warnings"
+          fi
